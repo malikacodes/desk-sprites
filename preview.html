@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>desk sprites preview</title>
+<style>
+  body { margin: 32px; background: #f4efe8; color: #3a2a2e; font: 14px/1.4 -apple-system, sans-serif; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-size: 14px; font-weight: 600; margin: 36px 0 12px; }
+  p { margin: 0 0 16px; color: #7a6570; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .card { background: #fffaf3; border-radius: 12px; padding: 12px; text-align: center; }
+  .pair { display: flex; gap: 8px; justify-content: center; }
+  .stack { display: flex; flex-direction: column; }
+  .sprite { image-rendering: pixelated; }
+  .label { font-size: 12px; margin-top: 8px; }
+  .who { font-size: 11px; opacity: 0.65; }
+  details { margin-bottom: 8px; }
+  summary { cursor: pointer; font-size: 13px; padding: 4px 0; }
+</style>
+</head>
+<body>
+<h1>Desk sprites</h1>
+<p>Reload this page after re-running draw_character.py.</p>
+
+<h2>Everyone: front idle, side view, dance</h2>
+<div class="row" id="cast"></div>
+
+<h2>Every animation, one character at a time (click a name to open)</h2>
+<div id="all"></div>
+
+<script>
+// Same numbers as the app's public/shared/sprite-frames.json.
+const FRAMES = {
+  front_idle: [0,1,2,3],        front_walk: [4,5,6,7],
+  front_sit_idle: [8,9,10,11],  front_sit_work: [12,13,14,15],
+  left_idle: [16,17,18,19],     left_walk: [20,21,22,23],
+  left_sit_idle: [24,25,26,27], left_sit_work: [28,29,30,31],
+  right_idle: [32,33,34,35],    right_walk: [36,37,38,39],
+  right_sit_idle: [40,41,42,43],right_sit_work: [44,45,46,47],
+  back_idle: [48,49,50,51],     back_walk: [52,53,54,55],
+  back_sit_idle: [56,57,58,59], back_sit_work: [60,61,62,63],
+  front_done_dance: [64,65,66,67], front_alert_jump: [68,69,70,71],
+};
+
+// [file, label], in the same order as the README.
+const CAST = [
+  ['bow_soft', 'bow, soft'],
+  ['puffs_soft', 'puffs, soft'],
+  ['bow_90s', 'bow, 90s'],
+  ['puffs_90s', 'puffs, 90s'],
+  ['braids', 'braids'],
+  ['waves', 'finger waves'],
+  ['bucket', 'bucket hat'],
+  ['locs', 'locs'],
+  ['hightop', 'high-top fade'],
+  ['pixie', 'pixie'],
+];
+
+const fresh = '?' + Date.now();   // the ?number stops the browser showing a stale copy
+const sheet = file => 'sprites/' + file + '.webp' + fresh;
+
+// Every animated character on the page registers itself here, and one
+// shared clock steps them all. (A separate timer each got heavy with this
+// many on screen.)
+const playing = [];
+
+// One animated character: shows a frame-sized window onto the big sheet and
+// slides the sheet behind it. `zoom` is how many times bigger than the real
+// 48x64 frame it's drawn.
+function sprite(sheet, name, caption, zoom = 3) {
+  const box = document.createElement('div');
+  const img = document.createElement('div');
+  img.className = 'sprite';
+  img.style.cssText = `width:${48 * zoom}px; height:${64 * zoom}px;
+    background-image:url('${sheet}'); background-size:${384 * zoom}px ${576 * zoom}px;`;
+  box.append(img);
+  if (caption) {
+    const label = document.createElement('div');
+    label.className = 'who';
+    label.textContent = caption;
+    box.append(label);
+  }
+  playing.push({ img, name, zoom });
+  return box;
+}
+
+let tick = 0;
+function step() {
+  for (const { img, name, zoom } of playing) {
+    // The desk strip plays the dance at 8 frames a second and everything
+    // else at 4, so everything else only moves on every other tick.
+    const count = name === 'front_done_dance' ? tick : Math.floor(tick / 2);
+    const frame = FRAMES[name][count % 4];
+    img.style.backgroundPosition =
+      `-${(frame % 8) * 48 * zoom}px -${Math.floor(frame / 8) * 64 * zoom}px`;
+  }
+  tick++;
+}
+setInterval(step, 125);
+
+function card(parent, title, sprites, { stacked = false } = {}) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  const group = document.createElement('div');
+  group.className = stacked ? 'stack' : 'pair';
+  group.append(...sprites);
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = title;
+  el.append(group, label);
+  parent.append(el);
+}
+
+const THREE = ['front_idle', 'left_idle', 'front_done_dance'];
+
+// Everyone, one column each
+const cast = document.getElementById('cast');
+for (const [file, label] of CAST) {
+  card(cast, label, THREE.map(name => sprite(sheet(file), name)), { stacked: true });
+}
+
+// Every animation, folded away per character
+const all = document.getElementById('all');
+for (const [file, label] of CAST) {
+  const fold = document.createElement('details');
+  const summary = document.createElement('summary');
+  summary.textContent = label;
+  const row = document.createElement('div');
+  row.className = 'row';
+  for (const name of Object.keys(FRAMES)) {
+    card(row, name.replaceAll('_', ' '), [sprite(sheet(file), name, '', 2)]);
+  }
+  fold.append(summary, row);
+  all.append(fold);
+}
+
+step();
+</script>
+</body>
+</html>
